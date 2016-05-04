@@ -15,10 +15,10 @@ mod.directive('infiniteScroll', [
                 infiniteScrollDisabled: '=',
                 infiniteScrollUseDocumentBottom: '=',
                 infiniteScrollListenForEvent: '@',
-                infiniteScrollReverse: '='
+                infiniteScrollReverse: '=',
             },
             link: function (scope, elem, attrs) {
-                var changeContainer, checkInterval, checkWhenEnabled, container, handleInfiniteScrollContainer, handleInfiniteScrollDisabled, handleInfiniteScrollDistance, handleInfiniteScrollReverse, handleInfiniteScrollUseDocumentBottom, handler, height, immediateCheck, offsetTop, pageYOffset, scrollDistance, reverse, scrollEnabled, throttle, unregisterEventListener, useDocumentBottom, windowElement;
+                var changeContainer, checkInterval, checkWhenEnabled, container, handleInfiniteScrollContainer, handleInfiniteScrollDisabled, handleInfiniteScrollDistance, handleInfiniteScrollReverse, handleInfiniteScrollUseDocumentBottom, handler, height, immediateCheck, offsetTop, pageYOffset, scrollDistance, reverse, scrollEnabled, keepScrollWatcher, setKeepScroll, throttle, unregisterEventListener, useDocumentBottom, windowElement;
                 windowElement = angular.element($window);
                 scrollDistance = null;
                 scrollEnabled = null;
@@ -28,6 +28,7 @@ mod.directive('infiniteScroll', [
                 useDocumentBottom = false;
                 unregisterEventListener = null;
                 checkInterval = false;
+                keepScrollWatcher = null;
                 height = function (elem) {
                     elem = elem[0] || elem;
                     if (isNaN(elem.offsetHeight)) {
@@ -53,7 +54,7 @@ mod.directive('infiniteScroll', [
                 handler = function () {
                     var shouldScroll;
                     if (reverse) {
-                        remaining =  container[0].scrollTop;
+                        remaining = container[0].scrollTop;
                         shouldScroll = remaining <= height(container) * scrollDistance;
                     } else {
                         var containerBottom, containerTopOffset, elementBottom, remaining;
@@ -130,8 +131,37 @@ mod.directive('infiniteScroll', [
                     }
                 });
                 handleInfiniteScrollReverse = function (v) {
-                    return reverse = v;
+                    reverse = v;
+                    setKeepScroll();
+                    return reverse;
                 };
+
+                var oldScrollHeight = 0;
+
+                setKeepScroll = function () {
+                    if (!container || container === windowElement) {
+                        return;
+                    }
+                    if (reverse) {
+                        if (keepScrollWatcher) {
+                            keepScrollWatcher.disconnect();
+                        }
+                        oldScrollHeight = container[0].scrollHeight;
+                        keepScrollWatcher = new MutationObserver(function () {
+                            container[0].scrollTop += container[0].scrollHeight - oldScrollHeight;
+                            oldScrollHeight = container[0].scrollHeight;
+                        });
+                        keepScrollWatcher.observe(container[0], {
+                            attributes: true,
+                            childList: true,
+                            characterData: true,
+                            subtree: true
+                        });
+                    } else if (keepScrollWatcher) {
+                        keepScrollWatcher.disconnect();
+                        keepScrollWatcher = null;
+                    }
+                }
                 scope.$watch('infiniteScrollReverse', handleInfiniteScrollReverse);
                 handleInfiniteScrollReverse(scope.infiniteScrollReverse);
                 handleInfiniteScrollDistance = function (v) {
@@ -158,6 +188,7 @@ mod.directive('infiniteScroll', [
                         container.unbind('scroll', handler);
                     }
                     container = newContainer;
+                    setKeepScroll();
                     if (newContainer != null) {
                         return container.bind('scroll', handler);
                     }
