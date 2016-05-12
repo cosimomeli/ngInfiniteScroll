@@ -15,7 +15,7 @@ mod.directive('infiniteScroll', [
                 infiniteScrollDisabled: '=',
                 infiniteScrollUseDocumentBottom: '=',
                 infiniteScrollListenForEvent: '@',
-                infiniteScrollReverse: '=',
+                infiniteScrollReverse: '='
             },
             link: function (scope, elem, attrs) {
                 var changeContainer, checkInterval, checkWhenEnabled, container, handleInfiniteScrollContainer, handleInfiniteScrollDisabled, handleInfiniteScrollDistance, handleInfiniteScrollReverse, handleInfiniteScrollUseDocumentBottom, handler, height, immediateCheck, offsetTop, pageYOffset, scrollDistance, reverse, scrollEnabled, keepScrollWatcher, setKeepScroll, throttle, unregisterEventListener, useDocumentBottom, windowElement;
@@ -136,8 +136,6 @@ mod.directive('infiniteScroll', [
                     return reverse;
                 };
 
-                var oldScrollHeight = 0;
-
                 setKeepScroll = function () {
                     if (!container || container === windowElement) {
                         return;
@@ -146,16 +144,31 @@ mod.directive('infiniteScroll', [
                         if (keepScrollWatcher) {
                             keepScrollWatcher.disconnect();
                         }
-                        oldScrollHeight = container[0].scrollHeight;
-                        keepScrollWatcher = new MutationObserver(function () {
-                            container[0].scrollTop += container[0].scrollHeight - oldScrollHeight;
-                            oldScrollHeight = container[0].scrollHeight;
+                        keepScrollWatcher = new MutationObserver(function (mutations) {
+                            //HEIGHT TO SCROLL
+                            var totalHeight = 0;
+                            var isPrepend = -1;
+                            angular.forEach(mutations, function (mutation) {
+                                for (var i = 0; i < mutation.addedNodes.length; i++) {
+                                    //FLAG INDICATING IF ELEMENTS HAVE BEEN ADDED FROM TOP
+                                    if (mutation.addedNodes[i].getBoundingClientRect) {
+                                        if (isPrepend === -1) {//UNSET FLAG, FIRST CHECK
+                                            //IF THE ELEMENT HAS NO UPPER SIBLING, THEN IT HAS BEEN PREPENDED
+                                            if (mutation.addedNodes[i].previousElementSibling === null) {
+                                                isPrepend = 1;
+                                            }
+                                        }
+                                        if (isPrepend === 1) {
+                                            var rect = mutation.addedNodes[i].getBoundingClientRect();
+                                            totalHeight += rect.height;
+                                        }
+                                    }
+                                }
+                            });
+                            container[0].scrollTop += totalHeight;
                         });
-                        keepScrollWatcher.observe(container[0], {
-                            attributes: true,
-                            childList: true,
-                            characterData: true,
-                            subtree: true
+                        keepScrollWatcher.observe(elem[0], {
+                            childList: true
                         });
                     } else if (keepScrollWatcher) {
                         keepScrollWatcher.disconnect();
