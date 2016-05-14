@@ -144,31 +144,37 @@ mod.directive('infiniteScroll', [
                         if (keepScrollWatcher) {
                             keepScrollWatcher.disconnect();
                         }
+
+                        var oldScrollHeight = container[0].scrollHeight;
+
                         keepScrollWatcher = new MutationObserver(function (mutations) {
-                            //HEIGHT TO SCROLL
-                            var totalHeight = 0;
-                            var isPrepend = -1;
-                            angular.forEach(mutations, function (mutation) {
-                                for (var i = 0; i < mutation.addedNodes.length; i++) {
-                                    //FLAG INDICATING IF ELEMENTS HAVE BEEN ADDED FROM TOP
-                                    if (mutation.addedNodes[i].getBoundingClientRect) {
-                                        if (isPrepend === -1) {//UNSET FLAG, FIRST CHECK
-                                            //IF THE ELEMENT HAS NO UPPER SIBLING, THEN IT HAS BEEN PREPENDED
-                                            if (mutation.addedNodes[i].previousElementSibling === null) {
-                                                isPrepend = 1;
+
+                            var threshold = offsetTop(container) + height(container);
+
+                            function checkPrepend() {
+                                for (var j = 0; j < mutations.length; j++) {
+                                    var mutation = mutations[j];
+                                    for (var i = 0; i < mutation.addedNodes.length; i++) {
+                                        if (mutation.addedNodes[i].getBoundingClientRect) {
+                                            //IF THE ELEMENT IS ABOVE THE BOTTOM LINE OF THE CONTAINER, TRIGGER THE SCROLL
+                                            if (offsetTop(angular.element(mutation.addedNodes[i])) < threshold) {
+                                                return 1;
                                             }
-                                        }
-                                        if (isPrepend === 1) {
-                                            var rect = mutation.addedNodes[i].getBoundingClientRect();
-                                            totalHeight += rect.height;
                                         }
                                     }
                                 }
-                            });
-                            container[0].scrollTop += totalHeight;
+                                return 0;
+                            }
+                            
+                            
+                            if (checkPrepend() === 1) {
+                                container[0].scrollTop += container[0].scrollHeight - oldScrollHeight;
+                            }
+                            oldScrollHeight = container[0].scrollHeight;
                         });
                         keepScrollWatcher.observe(elem[0], {
-                            childList: true
+                            childList: true,
+                            subtree: true
                         });
                     } else if (keepScrollWatcher) {
                         keepScrollWatcher.disconnect();
